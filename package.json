@@ -6,7 +6,7 @@
   },
   "name": "redis-lock",
   "description": "A locking primitive using redis.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "repository": {
     "type": "git",
     "url": "git://github.com/errorception/redis-lock.git"
