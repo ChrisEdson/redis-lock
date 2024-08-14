@@ -1,6 +1,6 @@
 "use strict";
 
-function acquireLock(
+async function acquireLock(
   client,
   lockName,
   timeout,
@@ -22,27 +22,28 @@ function acquireLock(
   }
 
   var lockTimeoutValue = Date.now() + timeout + 1;
-  client.set(
-    lockName,
-    lockTimeoutValue,
-    "PX",
-    timeout,
-    "NX",
-    function (err, result) {
-      if (err || result === null) {
-        if (shouldRetry) return retry();
-        return;
-      }
-      onLockAcquired(lockTimeoutValue);
+
+  try {
+    const result = await client.set(lockName, lockTimeoutValue, {
+      PX: timeout,
+      NX: true,
+    });
+
+    if (result === null && shouldRetry) {
+      retry();
+      return;
     }
-  );
+    onLockAcquired(lockTimeoutValue);
+  } catch (err) {
+    if (shouldRetry) {
+      retry();
+    }
+  }
 }
 
 module.exports = function (client, retryDelay) {
-  if (!(client && client.setnx)) {
-    throw new Error(
-      "You must specify a client instance of http://github.com/mranney/node_redis"
-    );
+  if (!(client && client.set)) {
+    throw new Error("You must specify a client instance of Node Redis");
   }
 
   retryDelay = retryDelay || 50;
@@ -84,11 +85,12 @@ module.exports = function (client, retryDelay) {
       shouldRetry,
       retryDelay,
       function (lockTimeoutValue) {
-        taskToPerform(function (done) {
+        taskToPerform(async function (done) {
           done = done || function () {};
 
           if (lockTimeoutValue > Date.now()) {
-            client.del(lockName, done);
+            await client.del(lockName);
+            done();
           } else {
             done();
           }
